@@ -88,3 +88,26 @@ module.exports.logout_get = (req, res) => {
   res.cookie('jwt', '', { maxAge: 1 });
   res.redirect('/');
 }
+
+module.exports.forgotPassword = async(req,res,next) =>{
+  //get user based on email
+  const email = req.body.email
+  try{
+    const user = await User.findOne(email)
+    if(!user){
+      res.return()
+    }
+    //generate random token
+    const resetToken = user.createpasswordResetToken();
+    await user.save({validateBeforeSave: false})
+    //send it back as an email
+  }catch(err){
+
+
+  }
+}
+
+
+module.exports.resetPassword = (req,res,next) =>{
+  
+}
