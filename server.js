@@ -1,5 +1,9 @@
 const mongoose = require('mongoose');
 const app = require('./app')
+const dotenv = require('dotenv')
+
+dotenv.config({ path: './config.env' });
+
 
 // database connection
 const dbURI = 'mongodb+srv://edumwas911:Bazokizo98@smoothie.xff912n.mongodb.net/Smoothies';

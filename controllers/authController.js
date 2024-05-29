@@ -1,5 +1,7 @@
 const User = require("../models/User");
 const jwt = require('jsonwebtoken');
+const sendMail = require('../utils/email')
+const crypto = require('crypto')
 
 // handle errors
 const handleErrors = (err) => {
@@ -44,15 +46,30 @@ const createToken = (id) => {
 };
 
 // controller actions
-module.exports.signup_get = (req, res) => {
+exports.signup_get = (req, res) => {
   res.render('signup');
 }
 
-module.exports.login_get = (req, res) => {
+exports.login_get = (req, res) => {
   res.render('login');
 }
+exports.forgotPassword_get = (req,res) => {
+  res.render('forgotPassword')
+}
+exports.showResetForm = async (req,res,next) =>{
+  const user = await User.findOne({
+    passwordResetToken:req.params.token,
+    passwordResetExpires:{$gt:Date.now()}
+  })
+  if(!user) {
+    return res.redirect('/forgotPassword')
+  }
+  res.render('resetPassword',{
+    token:req.params.token
+  })
+}
 
-module.exports.signup_post = async (req, res) => {
+exports.signup_post = async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -68,7 +85,7 @@ module.exports.signup_post = async (req, res) => {
  
 }
 
-module.exports.login_post = async (req, res) => {
+exports.login_post = async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -84,30 +101,60 @@ module.exports.login_post = async (req, res) => {
 
 }
 
-module.exports.logout_get = (req, res) => {
+exports.logout_get = (req, res) => {
   res.cookie('jwt', '', { maxAge: 1 });
   res.redirect('/');
 }
 
-module.exports.forgotPassword = async(req,res,next) =>{
+exports.forgotPassword = async(req,res,next) =>{
   //get user based on email
   const email = req.body.email
   try{
     const user = await User.findOne(email)
     if(!user){
-      res.return()
+      return res.redirect('/forgotPassword')
     }
     //generate random token
     const resetToken = user.createpasswordResetToken();
     await user.save({validateBeforeSave: false})
     //send it back as an email
+    const resetUrl = `${req.protocal}://${req.get('host')}/resetPassword/${resetToken}`
+    const message = `Forgot password? Click on the link to reset it ${resetUrl}. If not please ignore this email`
+    await sendMail({
+      email:user.email,
+      subject:'This reset link expires in 10 minutes',
+      message:'email sent'
+    })
+    res.status(200).json({
+      status:'success',
+      message:'Link sent to email'
+    })
   }catch(err){
-
 
   }
 }
 
 
-module.exports.resetPassword = (req,res,next) =>{
-  
+exports.resetPassword = async(req,res,next) =>{
+  //get user based on token
+  const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
+  const user = await User.findOne({passwordResetToken: hashedToken, passwordResetExpires:{$gt:Date.now()}})
+
+  //if token is still valid and user set new password
+  if(!user) {
+    return res.redirect('/forgotPassword');
+  }
+  user.password = req.body.password
+  user.passwordResetToken = undefined
+  user.passwordResetExpires = undefined
+  await user.save();
+  //log user in and send jwt
+  const token = createToken(user._id);
+  res.status(200).json({
+    status:'success',
+    token
+  });
+
+
 }
+
