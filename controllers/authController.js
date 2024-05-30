@@ -1,7 +1,8 @@
 const User = require("../models/User");
 const jwt = require('jsonwebtoken');
 const sendMail = require('../utils/email')
-const crypto = require('crypto')
+const crypto = require('crypto');
+const catchAsync = require("../utils/catchAsync");
 
 // handle errors
 const handleErrors = (err) => {
@@ -40,7 +41,7 @@ const handleErrors = (err) => {
 // create json web token
 const maxAge = 3 * 24 * 60 * 60;
 const createToken = (id) => {
-  return jwt.sign({ id }, 'mysuperlongsecret', {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: maxAge
   });
 };
@@ -85,31 +86,24 @@ exports.signup_post = async (req, res) => {
  
 }
 
-exports.login_post = async (req, res) => {
+exports.login_post = catchAsync(async (req, res) => {
   const { email, password } = req.body;
-
-  try {
     const user = await User.login(email, password);
     const token = createToken(user._id);
     res.cookie('jwt', token, { httpOnly: true, maxAge: maxAge * 1000 });
     res.status(200).json({ user: user._id });
-  } 
-  catch (err) {
-    const errors = handleErrors(err);
-    res.status(400).json({ errors });
-  }
 
-}
+})
 
 exports.logout_get = (req, res) => {
   res.cookie('jwt', '', { maxAge: 1 });
   res.redirect('/');
 }
 
-exports.forgotPassword = async(req,res,next) =>{
+exports.forgotPassword = catchAsync(async(req,res,next) =>{
   //get user based on email
   const email = req.body.email
-  try{
+
     const user = await User.findOne(email)
     if(!user){
       return res.redirect('/forgotPassword')
@@ -129,13 +123,10 @@ exports.forgotPassword = async(req,res,next) =>{
       status:'success',
       message:'Link sent to email'
     })
-  }catch(err){
-
-  }
-}
+})
 
 
-exports.resetPassword = async(req,res,next) =>{
+exports.resetPassword = catchAsync(async(req,res,next) =>{
   //get user based on token
   const hashedToken = crypto.createHash('sha256').update(req.params.token).digest('hex');
   const user = await User.findOne({passwordResetToken: hashedToken, passwordResetExpires:{$gt:Date.now()}})
@@ -156,5 +147,5 @@ exports.resetPassword = async(req,res,next) =>{
   });
 
 
-}
+})
 
