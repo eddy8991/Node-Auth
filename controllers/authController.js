@@ -3,7 +3,6 @@ const jwt = require('jsonwebtoken');
 const sendMail = require('../utils/email')
 const crypto = require('crypto');
 const catchAsync = require("../utils/catchAsync");
-const { start } = require("repl");
 
 // handle errors
 const handleErrors = (err) => {
@@ -71,13 +70,21 @@ exports.showResetForm = async (req,res,next) =>{
   })
 }
 
-exports.signup_post = catchAsync(async (req, res) => {
-    const { email, password } = req.body;
+exports.signup_post = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
     const user = await User.create({ email, password });
     const token = createToken(user._id);
     res.cookie('jwt', token, { httpOnly: true, maxAge: maxAge * 1000 });
     res.status(201).json({ user: user._id });
-})
+  }
+  catch(err) {
+    const errors = handleErrors(err);
+    res.status(400).json({ errors });
+  }
+ 
+}
 
 exports.login_post = catchAsync(async (req, res) => {
   const { email, password } = req.body;
